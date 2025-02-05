@@ -1,99 +1,149 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, notification } from 'antd';
+import { Form, Input, Button, notification, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import crearCircuitoUseCase from '../../core/useCases/crearCircuito';
 import circuitoRepository from '../../infrastructure/repositories/CircuitoRepository';
+import styles from '../../styles/components/Form.module.css';
 
 function AddCircuito() {
     const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const onFinish = async (values) => {
+        setLoading(true);
         try {
-            // Llama al caso de uso para crear un circuito
-            const crearCircuito = crearCircuitoUseCase(circuitoRepository);
-            await crearCircuito(values);
+            // Convertir explícitamente los valores numéricos
+            const circuitoData = {
+                ...values,
+                longitud: parseFloat(values.longitud),
+                numero_vueltas: parseInt(values.numero_vueltas),
+                numero_curvas: parseInt(values.numero_curvas)
+            };
 
-            // Muestra una notificación de éxito
+            const crearCircuito = crearCircuitoUseCase(circuitoRepository);
+            await crearCircuito(circuitoData);
+
             notification.success({
                 message: 'Éxito',
                 description: 'El circuito ha sido creado exitosamente.',
             });
 
-            // Reinicia el formulario
             form.resetFields();
+            navigate('/');
         } catch (error) {
-            // Muestra una notificación de error
             notification.error({
                 message: 'Error',
-                description: 'Hubo un problema al crear el circuito. Por favor, intenta nuevamente.',
+                description: error.message || 'Hubo un problema al crear el circuito. Por favor, intenta nuevamente.',
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h1>Agregar Circuito</h1>
-            <Form form={form} layout="vertical" onFinish={onFinish}>
-                {/* Campo para el nombre */}
-                <Form.Item
-                    label="Nombre"
-                    name="nombre"
-                    rules={[{ required: true, message: 'Por favor, ingresa el nombre del circuito.' }]}
-                >
-                    <Input placeholder="Nombre del circuito" />
-                </Form.Item>
+        <div className={styles.formContainer}>
+            <h1 className={styles.formTitle}>Agregar Circuito</h1>
+            <div className={styles.formSection}>
+                <Spin spinning={loading}>
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        onFinish={onFinish}
+                        disabled={loading}
+                    >
+                        <Form.Item
+                            label="Nombre"
+                            name="nombre"
+                            rules={[{ required: true, message: 'Por favor, ingresa el nombre del circuito.' }]}
+                        >
+                            <Input placeholder="Ej: Circuito de México" />
+                        </Form.Item>
 
-                {/* Campo para el país */}
-                <Form.Item
-                    label="País"
-                    name="pais"
-                    rules={[{ required: true, message: 'Por favor, ingresa el país del circuito.' }]}
-                >
-                    <Input placeholder="País del circuito" />
-                </Form.Item>
+                        <Form.Item
+                            label="País"
+                            name="pais"
+                            rules={[{ required: true, message: 'Por favor, ingresa el país del circuito.' }]}
+                        >
+                            <Input placeholder="Ej: México" />
+                        </Form.Item>
 
-                {/* Campo para la longitud */}
-                <Form.Item
-                    label="Longitud (km)"
-                    name="longitud"
-                    rules={[
-                        { required: true, message: 'Por favor, ingresa la longitud del circuito.' },
-                        { type: 'number', min: 0, message: 'La longitud debe ser un número positivo.' },
-                    ]}
-                >
-                    <Input type="number" placeholder="Longitud en kilómetros" />
-                </Form.Item>
+                        <Form.Item
+                            label="Longitud (km)"
+                            name="longitud"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa la longitud del circuito.' },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && parseFloat(value) <= 0) {
+                                            throw new Error('La longitud debe ser un número positivo.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                step="0.001"
+                                placeholder="Ej: 4.337"
+                            />
+                        </Form.Item>
 
-                {/* Campo para el número de vueltas */}
-                <Form.Item
-                    label="Número de Vueltas"
-                    name="numero_vueltas"
-                    rules={[
-                        { required: true, message: 'Por favor, ingresa el número de vueltas.' },
-                        { type: 'number', min: 1, message: 'El número de vueltas debe ser mayor a 0.' },
-                    ]}
-                >
-                    <Input type="number" placeholder="Número de vueltas" />
-                </Form.Item>
+                        <Form.Item
+                            label="Número de Vueltas"
+                            name="numero_vueltas"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa el número de vueltas.' },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && parseInt(value) <= 0) {
+                                            throw new Error('El número de vueltas debe ser mayor a 0.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                placeholder="Ej: 71"
+                            />
+                        </Form.Item>
 
-                {/* Campo para el número de curvas */}
-                <Form.Item
-                    label="Número de Curvas"
-                    name="numero_curvas"
-                    rules={[
-                        { required: true, message: 'Por favor, ingresa el número de curvas.' },
-                        { type: 'number', min: 1, message: 'El número de curvas debe ser mayor a 0.' },
-                    ]}
-                >
-                    <Input type="number" placeholder="Número de curvas" />
-                </Form.Item>
+                        <Form.Item
+                            label="Número de Curvas"
+                            name="numero_curvas"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa el número de curvas.' },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && parseInt(value) <= 0) {
+                                            throw new Error('El número de curvas debe ser mayor a 0.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                placeholder="Ej: 16"
+                            />
+                        </Form.Item>
 
-                {/* Botón de envío */}
-                <Form.Item>
-                    <Button type="primary" htmlType="submit">
-                        Agregar Circuito
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <Form.Item>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                className={styles.submitButton}
+                                loading={loading}
+                            >
+                                Agregar Circuito
+                            </Button>
+                        </Form.Item>
+                    </Form>
+                </Spin>
+            </div>
         </div>
     );
 }

@@ -1,0 +1,28 @@
+:root {
+    /* Colores principales */
+    --primary-color: #1677ff;  /* Color principal de Ant Design */
+    --secondary-color: #001529; /* Color del header de Ant Design dark */
+
+    /* Colores de texto */
+    --text-primary: rgba(0, 0, 0, 0.85);
+    --text-secondary: rgba(0, 0, 0, 0.65);
+    --text-disabled: rgba(0, 0, 0, 0.25);
+
+    /* Espaciado */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* Breakpoints */
+    --breakpoint-sm: 576px;
+    --breakpoint-md: 768px;
+    --breakpoint-lg: 992px;
+    --breakpoint-xl: 1200px;
+
+    /* Border radius */
+    --border-radius-sm: 2px;
+    --border-radius-md: 4px;
+    --border-radius-lg: 8px;
+}

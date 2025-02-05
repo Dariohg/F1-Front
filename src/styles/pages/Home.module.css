@@ -1,0 +1,42 @@
+.container {
+    padding: 24px;
+}
+
+.sectionTitle {
+    margin-bottom: 24px;
+    color: #1f1f1f;
+}
+
+.cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 48px;
+}
+
+.card {
+    height: 100%;
+}
+
+.cardActions {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+}
+
+.label {
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.dataRow {
+    margin-bottom: 8px;
+}
+
+.noData {
+    text-align: center;
+    padding: 24px;
+    background: #fafafa;
+    border-radius: 8px;
+    color: #666;
+}

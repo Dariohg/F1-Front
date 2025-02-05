@@ -1,6 +1,7 @@
-import 'react';
+import React from 'react';
 import { Layout, Menu } from 'antd';
 import { Link, useLocation } from 'react-router-dom';
+import styles from '../../styles/components/Header.module.css';
 
 const { Header } = Layout;
 
@@ -14,8 +15,14 @@ function HeaderComponent() {
     ];
 
     return (
-        <Header>
-            <Menu theme="dark" mode="horizontal" selectedKeys={[location.pathname]} items={menuItems} />
+        <Header className={styles.header}>
+            <Menu
+                theme="dark"
+                mode="horizontal"
+                selectedKeys={[location.pathname]}
+                items={menuItems}
+                className={styles.menu}
+            />
         </Header>
     );
 }

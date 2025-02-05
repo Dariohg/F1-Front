@@ -1,96 +1,137 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, notification } from 'antd';
+import { Form, Input, Button, notification, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
 import crearPilotoUseCase from '../../core/useCases/crearPiloto';
 import pilotoRepository from '../../infrastructure/repositories/PilotoRepository';
+import styles from '../../styles/components/Form.module.css';
 
 function AddPiloto() {
     const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
+    const navigate = useNavigate();
 
     const onFinish = async (values) => {
+        setLoading(true);
         try {
-            // Llama al caso de uso para crear un piloto
-            const crearPiloto = crearPilotoUseCase(pilotoRepository);
-            await crearPiloto(values);
+            // Convertir explícitamente los valores numéricos
+            const pilotoData = {
+                ...values,
+                numero_carro: parseInt(values.numero_carro),
+                edad: parseInt(values.edad)
+            };
 
-            // Muestra una notificación de éxito
+            const crearPiloto = crearPilotoUseCase(pilotoRepository);
+            await crearPiloto(pilotoData);
+
             notification.success({
                 message: 'Éxito',
                 description: 'El piloto ha sido creado exitosamente.',
             });
 
-            // Reinicia el formulario
             form.resetFields();
+            navigate('/');
         } catch (error) {
-            // Muestra una notificación de error
             notification.error({
                 message: 'Error',
-                description: 'Hubo un problema al crear el piloto. Por favor, intenta nuevamente.',
+                description: error.message || 'Hubo un problema al crear el piloto. Por favor, intenta nuevamente.',
             });
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div style={{ padding: '20px' }}>
-            <h1>Agregar Piloto</h1>
-            <Form form={form} layout="vertical" onFinish={onFinish}>
-                {/* Campo para el nombre completo */}
-                <Form.Item
-                    label="Nombre Completo"
-                    name="nombre_completo"
-                    rules={[{ required: true, message: 'Por favor, ingresa el nombre completo del piloto.' }]}
-                >
-                    <Input placeholder="Nombre completo del piloto" />
-                </Form.Item>
+        <div className={styles.formContainer}>
+            <h1 className={styles.formTitle}>Agregar Piloto</h1>
+            <div className={styles.formSection}>
+                <Spin spinning={loading}>
+                    <Form
+                        form={form}
+                        layout="vertical"
+                        onFinish={onFinish}
+                        disabled={loading}
+                    >
+                        <Form.Item
+                            label="Nombre Completo"
+                            name="nombre_completo"
+                            rules={[{ required: true, message: 'Por favor, ingresa el nombre completo del piloto.' }]}
+                        >
+                            <Input placeholder="Ej: Max Verstappen" />
+                        </Form.Item>
 
-                {/* Campo para la nacionalidad */}
-                <Form.Item
-                    label="Nacionalidad"
-                    name="nacionalidad"
-                    rules={[{ required: true, message: 'Por favor, ingresa la nacionalidad del piloto.' }]}
-                >
-                    <Input placeholder="Nacionalidad del piloto" />
-                </Form.Item>
+                        <Form.Item
+                            label="Nacionalidad"
+                            name="nacionalidad"
+                            rules={[{ required: true, message: 'Por favor, ingresa la nacionalidad del piloto.' }]}
+                        >
+                            <Input placeholder="Ej: Holanda" />
+                        </Form.Item>
 
-                {/* Campo para el nombre del equipo */}
-                <Form.Item
-                    label="Nombre del Equipo"
-                    name="nombre_equipo"
-                    rules={[{ required: true, message: 'Por favor, ingresa el nombre del equipo.' }]}
-                >
-                    <Input placeholder="Nombre del equipo" />
-                </Form.Item>
+                        <Form.Item
+                            label="Nombre del Equipo"
+                            name="nombre_equipo"
+                            rules={[{ required: true, message: 'Por favor, ingresa el nombre del equipo.' }]}
+                        >
+                            <Input placeholder="Ej: Red Bull Racing" />
+                        </Form.Item>
 
-                {/* Campo para el número del carro */}
-                <Form.Item
-                    label="Número del Carro"
-                    name="numero_carro"
-                    rules={[
-                        { required: true, message: 'Por favor, ingresa el número del carro.' },
-                        { type: 'number', min: 1, message: 'El número del carro debe ser mayor a 0.' },
-                    ]}
-                >
-                    <Input type="number" placeholder="Número del carro" />
-                </Form.Item>
+                        <Form.Item
+                            label="Número del Carro"
+                            name="numero_carro"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa el número del carro.' },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && parseInt(value) <= 0) {
+                                            throw new Error('El número del carro debe ser mayor a 0.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                min="1"
+                                placeholder="Ej: 1"
+                            />
+                        </Form.Item>
 
-                {/* Campo para la edad */}
-                <Form.Item
-                    label="Edad"
-                    name="edad"
-                    rules={[
-                        { required: true, message: 'Por favor, ingresa la edad del piloto.' },
-                        { type: 'number', min: 18, max: 99, message: 'La edad debe estar entre 18 y 99 años.' },
-                    ]}
-                >
-                    <Input type="number" placeholder="Edad del piloto" />
-                </Form.Item>
+                        <Form.Item
+                            label="Edad"
+                            name="edad"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa la edad del piloto.' },
+                                {
+                                    validator: async (_, value) => {
+                                        const edad = parseInt(value);
+                                        if (value && (edad < 18 || edad > 99)) {
+                                            throw new Error('La edad debe estar entre 18 y 99 años.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                min="18"
+                                max="99"
+                                placeholder="Ej: 26"
+                            />
+                        </Form.Item>
 
-                {/* Botón de envío */}
-                <Form.Item>
-                    <Button type="primary" htmlType="submit">
-                        Agregar Piloto
-                    </Button>
-                </Form.Item>
-            </Form>
+                        <Form.Item>
+                            <Button
+                                type="primary"
+                                htmlType="submit"
+                                className={styles.submitButton}
+                                loading={loading}
+                            >
+                                Agregar Piloto
+                            </Button>
+                        </Form.Item>
+                    </Form>
+                </Spin>
+            </div>
         </div>
     );
 }
