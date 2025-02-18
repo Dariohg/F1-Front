@@ -28,12 +28,13 @@ class CircuitoRepository extends ICircuitoRepository {
         }
     }
 
-    async eliminarCircuito(id) {
+    async obtenerCircuito(id) {
         try {
-            await apiClient.delete(`/circuitos/${id}`);
+            const response = await apiClient.get(`/circuitos/${id}`);
+            return response.data;
         } catch (error) {
-            console.error('Error al eliminar circuito:', error);
-            throw new Error(error.response?.data?.message || 'Error al eliminar el circuito');
+            console.error('Error al obtener circuito:', error);
+            throw new Error(error.response?.data?.message || 'Error al obtener el circuito');
         }
     }
 
@@ -44,6 +45,15 @@ class CircuitoRepository extends ICircuitoRepository {
         } catch (error) {
             console.error('Error al actualizar circuito:', error);
             throw new Error(error.response?.data?.message || 'Error al actualizar el circuito');
+        }
+    }
+
+    async eliminarCircuito(id) {
+        try {
+            await apiClient.delete(`/circuitos/${id}`);
+        } catch (error) {
+            console.error('Error al eliminar circuito:', error);
+            throw new Error(error.response?.data?.message || 'Error al eliminar el circuito');
         }
     }
 }

@@ -1,0 +1,77 @@
+.container {
+    padding: 24px;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+}
+
+.cardGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.card {
+    height: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo para el contenedor del título de la card */
+.cardTitle {
+    position: relative;
+    padding-right: 90px; /* Espacio para los botones */
+}
+
+/* Estilo para el texto del título */
+.cardTitleText {
+    white-space: normal;
+    word-wrap: break-word;
+    line-height: 1.5;
+    display: block;
+    margin-right: 8px;
+}
+
+.cardActions {
+    position: absolute;
+    top: 0;
+    right: 0;
+    display: flex;
+    gap: 8px;
+}
+
+.dataRow {
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.label {
+    font-weight: 600;
+    color: #666;
+}
+
+.value {
+    color: #1f1f1f;
+}
+
+.noData {
+    text-align: center;
+    padding: 48px;
+    background: #fafafa;
+    border-radius: 8px;
+    color: #666;
+}
+
+.spinContainer {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 200px;
+}

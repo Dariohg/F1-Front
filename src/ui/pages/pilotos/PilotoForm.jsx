@@ -1,60 +1,70 @@
-import React, { useState } from 'react';
+import  { useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
 import { Form, Input, Button, notification, Spin } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import crearPilotoUseCase from '../../core/useCases/crearPiloto';
-import pilotoRepository from '../../infrastructure/repositories/PilotoRepository';
-import styles from '../../styles/components/Form.module.css';
+import { useNavigate, useParams } from 'react-router-dom';
+import { PilotoViewModel } from '../../../viewModels/pilotos/PilotoViewModel';
+import styles from '../../../styles/components/Form.module.css';
 
-function AddPiloto() {
+const PilotoForm = observer(() => {
     const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { id } = useParams();
+    const pilotoViewModel = new PilotoViewModel();
 
-    const onFinish = async (values) => {
-        setLoading(true);
-        try {
-            // Convertir explícitamente los valores numéricos
-            const pilotoData = {
-                ...values,
-                numero_carro: parseInt(values.numero_carro),
-                edad: parseInt(values.edad)
-            };
+    useEffect(() => {
+        if (id) {
+            cargarPiloto();
+        }
+    }, [id]);
 
-            const crearPiloto = crearPilotoUseCase(pilotoRepository);
-            await crearPiloto(pilotoData);
-
-            notification.success({
-                message: 'Éxito',
-                description: 'El piloto ha sido creado exitosamente.',
-            });
-
-            form.resetFields();
-            navigate('/');
-        } catch (error) {
+    const cargarPiloto = async () => {
+        const success = await pilotoViewModel.cargar(id);
+        if (success) {
+            form.setFieldsValue(pilotoViewModel.piloto);
+        } else {
             notification.error({
                 message: 'Error',
-                description: error.message || 'Hubo un problema al crear el piloto. Por favor, intenta nuevamente.',
+                description: pilotoViewModel.error || 'Error al cargar el piloto'
             });
-        } finally {
-            setLoading(false);
+            navigate('/pilotos');
+        }
+    };
+
+    const onFinish = async (values) => {
+        const success = await pilotoViewModel.guardar(values);
+
+        if (success) {
+            notification.success({
+                message: 'Éxito',
+                description: `El piloto ha sido ${id ? 'actualizado' : 'creado'} exitosamente.`,
+            });
+            form.resetFields();
+            navigate('/pilotos');
+        } else {
+            notification.error({
+                message: 'Error',
+                description: pilotoViewModel.error || `Error al ${id ? 'actualizar' : 'crear'} el piloto.`,
+            });
         }
     };
 
     return (
         <div className={styles.formContainer}>
-            <h1 className={styles.formTitle}>Agregar Piloto</h1>
+            <h1 className={styles.formTitle}>{id ? 'Editar' : 'Agregar'} Piloto</h1>
             <div className={styles.formSection}>
-                <Spin spinning={loading}>
+                <Spin spinning={pilotoViewModel.loading}>
                     <Form
                         form={form}
                         layout="vertical"
                         onFinish={onFinish}
-                        disabled={loading}
+                        disabled={pilotoViewModel.loading}
                     >
                         <Form.Item
                             label="Nombre Completo"
                             name="nombre_completo"
                             rules={[{ required: true, message: 'Por favor, ingresa el nombre completo del piloto.' }]}
+                            validateStatus={pilotoViewModel.formErrors.nombre_completo ? 'error' : ''}
+                            help={pilotoViewModel.formErrors.nombre_completo}
                         >
                             <Input placeholder="Ej: Max Verstappen" />
                         </Form.Item>
@@ -63,6 +73,8 @@ function AddPiloto() {
                             label="Nacionalidad"
                             name="nacionalidad"
                             rules={[{ required: true, message: 'Por favor, ingresa la nacionalidad del piloto.' }]}
+                            validateStatus={pilotoViewModel.formErrors.nacionalidad ? 'error' : ''}
+                            help={pilotoViewModel.formErrors.nacionalidad}
                         >
                             <Input placeholder="Ej: Holanda" />
                         </Form.Item>
@@ -71,6 +83,8 @@ function AddPiloto() {
                             label="Nombre del Equipo"
                             name="nombre_equipo"
                             rules={[{ required: true, message: 'Por favor, ingresa el nombre del equipo.' }]}
+                            validateStatus={pilotoViewModel.formErrors.nombre_equipo ? 'error' : ''}
+                            help={pilotoViewModel.formErrors.nombre_equipo}
                         >
                             <Input placeholder="Ej: Red Bull Racing" />
                         </Form.Item>
@@ -88,6 +102,8 @@ function AddPiloto() {
                                     }
                                 }
                             ]}
+                            validateStatus={pilotoViewModel.formErrors.numero_carro ? 'error' : ''}
+                            help={pilotoViewModel.formErrors.numero_carro}
                         >
                             <Input
                                 type="number"
@@ -110,6 +126,8 @@ function AddPiloto() {
                                     }
                                 }
                             ]}
+                            validateStatus={pilotoViewModel.formErrors.edad ? 'error' : ''}
+                            help={pilotoViewModel.formErrors.edad}
                         >
                             <Input
                                 type="number"
@@ -124,9 +142,9 @@ function AddPiloto() {
                                 type="primary"
                                 htmlType="submit"
                                 className={styles.submitButton}
-                                loading={loading}
+                                loading={pilotoViewModel.loading}
                             >
-                                Agregar Piloto
+                                {id ? 'Actualizar' : 'Agregar'} Piloto
                             </Button>
                         </Form.Item>
                     </Form>
@@ -134,6 +152,6 @@ function AddPiloto() {
             </div>
         </div>
     );
-}
+});
 
-export default AddPiloto;
+export default PilotoForm;

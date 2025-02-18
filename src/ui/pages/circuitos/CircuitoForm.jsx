@@ -1,71 +1,82 @@
-import React, { useState } from 'react';
+import { useEffect } from 'react';
+import { observer } from 'mobx-react-lite';
 import { Form, Input, Button, notification, Spin } from 'antd';
-import { useNavigate } from 'react-router-dom';
-import crearCircuitoUseCase from '../../core/useCases/crearCircuito';
-import circuitoRepository from '../../infrastructure/repositories/CircuitoRepository';
-import styles from '../../styles/components/Form.module.css';
+import { useNavigate, useParams } from 'react-router-dom';
+import { CircuitoViewModel } from '../../../viewModels/circuitos/CircuitoViewModel';
+import styles from '../../../styles/components/Form.module.css';
 
-function AddCircuito() {
+const CircuitoForm = observer(() => {
     const [form] = Form.useForm();
-    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
+    const { id } = useParams();
+    const circuitoViewModel = new CircuitoViewModel();
 
-    const onFinish = async (values) => {
-        setLoading(true);
-        try {
-            // Convertir explícitamente los valores numéricos
-            const circuitoData = {
-                ...values,
-                longitud: parseFloat(values.longitud),
-                numero_vueltas: parseInt(values.numero_vueltas),
-                numero_curvas: parseInt(values.numero_curvas)
-            };
+    useEffect(() => {
+        if (id) {
+            cargarCircuito();
+        }
+    }, [id]);
 
-            const crearCircuito = crearCircuitoUseCase(circuitoRepository);
-            await crearCircuito(circuitoData);
-
-            notification.success({
-                message: 'Éxito',
-                description: 'El circuito ha sido creado exitosamente.',
-            });
-
-            form.resetFields();
-            navigate('/');
-        } catch (error) {
+    const cargarCircuito = async () => {
+        const success = await circuitoViewModel.cargar(id);
+        if (success) {
+            form.setFieldsValue(circuitoViewModel.circuito);
+        } else {
             notification.error({
                 message: 'Error',
-                description: error.message || 'Hubo un problema al crear el circuito. Por favor, intenta nuevamente.',
+                description: circuitoViewModel.error || 'Error al cargar el circuito'
             });
-        } finally {
-            setLoading(false);
+            navigate('/circuitos');
+        }
+    };
+
+    const onFinish = async (values) => {
+        const success = await circuitoViewModel.guardar(values);
+
+        if (success) {
+            notification.success({
+                message: 'Éxito',
+                description: `El circuito ha sido ${id ? 'actualizado' : 'creado'} exitosamente.`,
+            });
+            form.resetFields();
+            navigate('/circuitos');
+        } else {
+            notification.error({
+                message: 'Error',
+                description: circuitoViewModel.error || `Error al ${id ? 'actualizar' : 'crear'} el circuito.`,
+            });
         }
     };
 
     return (
         <div className={styles.formContainer}>
-            <h1 className={styles.formTitle}>Agregar Circuito</h1>
+            <h1 className={styles.formTitle}>{id ? 'Editar' : 'Agregar'} Circuito</h1>
             <div className={styles.formSection}>
-                <Spin spinning={loading}>
+                <Spin spinning={circuitoViewModel.loading}>
                     <Form
                         form={form}
                         layout="vertical"
                         onFinish={onFinish}
-                        disabled={loading}
+                        disabled={circuitoViewModel.loading}
                     >
                         <Form.Item
                             label="Nombre"
                             name="nombre"
                             rules={[{ required: true, message: 'Por favor, ingresa el nombre del circuito.' }]}
+                            validateStatus={circuitoViewModel.formErrors.nombre ? 'error' : ''}
+                            help={circuitoViewModel.formErrors.nombre}
                         >
-                            <Input placeholder="Ej: Circuito de México" />
+                            <Input placeholder="Ej: Circuito de Mónaco" />
                         </Form.Item>
 
                         <Form.Item
                             label="País"
                             name="pais"
                             rules={[{ required: true, message: 'Por favor, ingresa el país del circuito.' }]}
+                            validateStatus={circuitoViewModel.formErrors.pais ? 'error' : ''}
+                            help={circuitoViewModel.formErrors.pais}
                         >
-                            <Input placeholder="Ej: México" />
+                            <Input placeholder="Ej: Mónaco" />
                         </Form.Item>
 
                         <Form.Item
@@ -81,11 +92,13 @@ function AddCircuito() {
                                     }
                                 }
                             ]}
+                            validateStatus={circuitoViewModel.formErrors.longitud ? 'error' : ''}
+                            help={circuitoViewModel.formErrors.longitud}
                         >
                             <Input
                                 type="number"
                                 step="0.001"
-                                placeholder="Ej: 4.337"
+                                placeholder="Ej: 3.337"
                             />
                         </Form.Item>
 
@@ -102,11 +115,13 @@ function AddCircuito() {
                                     }
                                 }
                             ]}
+                            validateStatus={circuitoViewModel.formErrors.numero_vueltas ? 'error' : ''}
+                            help={circuitoViewModel.formErrors.numero_vueltas}
                         >
                             <Input
                                 type="number"
                                 min="1"
-                                placeholder="Ej: 71"
+                                placeholder="Ej: 78"
                             />
                         </Form.Item>
 
@@ -123,11 +138,13 @@ function AddCircuito() {
                                     }
                                 }
                             ]}
+                            validateStatus={circuitoViewModel.formErrors.numero_curvas ? 'error' : ''}
+                            help={circuitoViewModel.formErrors.numero_curvas}
                         >
                             <Input
                                 type="number"
                                 min="1"
-                                placeholder="Ej: 16"
+                                placeholder="Ej: 19"
                             />
                         </Form.Item>
 
@@ -136,9 +153,9 @@ function AddCircuito() {
                                 type="primary"
                                 htmlType="submit"
                                 className={styles.submitButton}
-                                loading={loading}
+                                loading={circuitoViewModel.loading}
                             >
-                                Agregar Circuito
+                                {id ? 'Actualizar' : 'Agregar'} Circuito
                             </Button>
                         </Form.Item>
                     </Form>
@@ -146,6 +163,6 @@ function AddCircuito() {
             </div>
         </div>
     );
-}
+});
 
-export default AddCircuito;
+export default CircuitoForm;

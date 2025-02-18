@@ -7,11 +7,15 @@ export default class ICircuitoRepository {
         throw new Error('Método obtenerCircuitos debe ser implementado');
     }
 
-    async eliminarCircuito(id) { // eslint-disable-line no-unused-vars
-        throw new Error('Método eliminarCircuito debe ser implementado');
+    async obtenerCircuito(id) { // eslint-disable-line no-unused-vars
+        throw new Error('Método obtenerCircuito debe ser implementado');
     }
 
     async actualizarCircuito(id, circuito) { // eslint-disable-line no-unused-vars
         throw new Error('Método actualizarCircuito debe ser implementado');
+    }
+
+    async eliminarCircuito(id) { // eslint-disable-line no-unused-vars
+        throw new Error('Método eliminarCircuito debe ser implementado');
     }
 }

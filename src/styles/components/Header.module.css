@@ -7,8 +7,19 @@
     z-index: 1;
 }
 
+.headerContent {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 16px;
+}
+
 .menu {
-    width: 100%;
-    justify-content: flex-start;
-    background-color: #001529;
+    flex: 1;
+}
+
+.addButton {
+    margin-left: 16px;
 }

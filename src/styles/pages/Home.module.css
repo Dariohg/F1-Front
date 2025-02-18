@@ -1,42 +1,63 @@
 .container {
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 24px;
+}
+
+.title {
+    margin-bottom: 32px;
+    text-align: center;
+}
+
+.sectionCard {
+    height: 100%;
+    transition: all 0.3s ease;
+}
+
+.sectionCard:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .sectionTitle {
-    margin-bottom: 24px;
-    color: #1f1f1f;
-}
-
-.cardGrid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 24px;
-    margin-bottom: 48px;
-}
-
-.card {
-    height: 100%;
-}
-
-.cardActions {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-}
-
-.label {
+    font-size: 20px;
     font-weight: 600;
-    margin-right: 8px;
+    margin-bottom: 16px;
 }
 
-.dataRow {
-    margin-bottom: 8px;
-}
-
-.noData {
-    text-align: center;
-    padding: 24px;
-    background: #fafafa;
-    border-radius: 8px;
+.sectionDescription {
     color: #666;
+    margin-bottom: 24px;
+}
+
+.actionButtons {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+}
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 24px;
+    margin-top: 32px;
+}
+
+.statCard {
+    padding: 16px;
+    text-align: center;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.statValue {
+    font-size: 24px;
+    font-weight: 600;
+    color: #1677ff;
+}
+
+.statLabel {
+    color: #666;
+    margin-top: 8px;
 }
