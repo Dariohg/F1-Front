@@ -6,6 +6,7 @@ import Home from './ui/pages/Home.jsx';
 import AddCircuito from './ui/pages/AddCircuito';
 import AddPiloto from './ui/pages/AddPiloto';
 import styles from './styles/base/_layout.module.css';
+import CircuitoDetail from './ui/pages/CircuitoDetail';
 
 const { Content } = Layout;
 
@@ -19,6 +20,7 @@ function App() {
                         <Route path="/" element={<Home />} />
                         <Route path="/add-circuito" element={<AddCircuito />} />
                         <Route path="/add-piloto" element={<AddPiloto />} />
+                        <Route path="/circuito/:id" element={<CircuitoDetail />} />
                     </Routes>
                 </Content>
             </Layout>

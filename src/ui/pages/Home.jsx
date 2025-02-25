@@ -1,11 +1,12 @@
 import  { useEffect, useState } from 'react';
 import { Card, Button, Empty, Spin, Typography, Modal, notification } from 'antd';
-import { EditOutlined, DeleteOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import {EditOutlined, DeleteOutlined, ExclamationCircleOutlined, CarOutlined} from '@ant-design/icons';
 import circuitoRepository from '../../infrastructure/repositories/CircuitoRepository';
 import pilotoRepository from '../../infrastructure/repositories/PilotoRepository';
 import EditCircuitoModal from '../components/EditCircuitoModal';
 import EditPilotoModal from '../components/EditPilotoModal';
 import styles from '../../styles/pages/Home.module.css';
+import { Link } from 'react-router-dom';
 
 const { Title } = Typography;
 const { confirm } = Modal;
@@ -103,6 +104,11 @@ function Home() {
             key={circuito.id}
             className={styles.card}
             title={circuito.nombre}
+            actions={[
+                <Link to={`/circuito/${circuito.id}`} key="view">
+                    <Button type="link" icon={<CarOutlined />}>Ver Carrera</Button>
+                </Link>
+            ]}
         >
             <div className={styles.cardActions}>
                 <Button
