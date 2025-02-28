@@ -18,7 +18,8 @@ function AddCircuito() {
                 ...values,
                 longitud: parseFloat(values.longitud),
                 numero_vueltas: parseInt(values.numero_vueltas),
-                numero_curvas: parseInt(values.numero_curvas)
+                numero_curvas: parseInt(values.numero_curvas),
+                tiempo_promedio_vuelta: parseFloat(values.tiempo_promedio_vuelta)
             };
 
             const crearCircuito = crearCircuitoUseCase(circuitoRepository);
@@ -128,6 +129,27 @@ function AddCircuito() {
                                 type="number"
                                 min="1"
                                 placeholder="Ej: 16"
+                            />
+                        </Form.Item>
+
+                        <Form.Item
+                            label="Tiempo Promedio de Vuelta (segundos)"
+                            name="tiempo_promedio_vuelta"
+                            rules={[
+                                { required: true, message: 'Por favor, ingresa el tiempo promedio de vuelta.' },
+                                {
+                                    validator: async (_, value) => {
+                                        if (value && parseFloat(value) <= 0) {
+                                            throw new Error('El tiempo promedio debe ser mayor a 0.');
+                                        }
+                                    }
+                                }
+                            ]}
+                        >
+                            <Input
+                                type="number"
+                                step="0.001"
+                                placeholder="Ej: 82.500"
                             />
                         </Form.Item>
 

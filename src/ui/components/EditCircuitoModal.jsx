@@ -1,8 +1,8 @@
 import React from 'react';
 import { Modal, Form, Input, notification } from 'antd';
+import PropTypes from 'prop-types';
 import circuitoRepository from '../../infrastructure/repositories/CircuitoRepository';
 
-// eslint-disable-next-line react/prop-types
 const EditCircuitoModal = ({ visible, circuito, onCancel, onSuccess }) => {
     const [form] = Form.useForm();
 
@@ -15,12 +15,12 @@ const EditCircuitoModal = ({ visible, circuito, onCancel, onSuccess }) => {
     const handleOk = async () => {
         try {
             const values = await form.validateFields();
-            // eslint-disable-next-line react/prop-types
             await circuitoRepository.actualizarCircuito(circuito.id, {
                 ...values,
                 longitud: parseFloat(values.longitud),
                 numero_vueltas: parseInt(values.numero_vueltas),
-                numero_curvas: parseInt(values.numero_curvas)
+                numero_curvas: parseInt(values.numero_curvas),
+                tiempo_promedio_vuelta: parseFloat(values.tiempo_promedio_vuelta)
             });
 
             notification.success({
@@ -29,7 +29,6 @@ const EditCircuitoModal = ({ visible, circuito, onCancel, onSuccess }) => {
             });
 
             onSuccess();
-            // eslint-disable-next-line no-unused-vars
         } catch (error) {
             notification.error({
                 message: 'Error',
@@ -41,7 +40,7 @@ const EditCircuitoModal = ({ visible, circuito, onCancel, onSuccess }) => {
     return (
         <Modal
             title="Editar Circuito"
-            visible={visible}
+            open={visible}
             onOk={handleOk}
             onCancel={onCancel}
             okText="Actualizar"
@@ -117,9 +116,33 @@ const EditCircuitoModal = ({ visible, circuito, onCancel, onSuccess }) => {
                 >
                     <Input type="number" />
                 </Form.Item>
+
+                <Form.Item
+                    name="tiempo_promedio_vuelta"
+                    label="Tiempo Promedio de Vuelta (segundos)"
+                    rules={[
+                        { required: true, message: 'Por favor ingresa el tiempo promedio de vuelta' },
+                        {
+                            validator: async (_, value) => {
+                                if (value && parseFloat(value) <= 0) {
+                                    throw new Error('El tiempo promedio debe ser mayor a 0');
+                                }
+                            }
+                        }
+                    ]}
+                >
+                    <Input type="number" step="0.001" />
+                </Form.Item>
             </Form>
         </Modal>
     );
+};
+
+EditCircuitoModal.propTypes = {
+    visible: PropTypes.bool.isRequired,
+    circuito: PropTypes.object,
+    onCancel: PropTypes.func.isRequired,
+    onSuccess: PropTypes.func.isRequired
 };
 
 export default EditCircuitoModal;

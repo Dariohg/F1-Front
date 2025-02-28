@@ -9,7 +9,8 @@ class CircuitoRepository extends ICircuitoRepository {
                 pais: circuito.pais,
                 longitud: parseFloat(circuito.longitud),
                 numero_vueltas: parseInt(circuito.numero_vueltas),
-                numero_curvas: parseInt(circuito.numero_curvas)
+                numero_curvas: parseInt(circuito.numero_curvas),
+                tiempo_promedio_vuelta: parseFloat(circuito.tiempo_promedio_vuelta)
             });
             return response.data;
         } catch (error) {
@@ -39,7 +40,13 @@ class CircuitoRepository extends ICircuitoRepository {
 
     async actualizarCircuito(id, circuito) {
         try {
-            const response = await apiClient.put(`/circuitos/${id}`, circuito);
+            const response = await apiClient.put(`/circuitos/${id}`, {
+                ...circuito,
+                longitud: parseFloat(circuito.longitud),
+                numero_vueltas: parseInt(circuito.numero_vueltas),
+                numero_curvas: parseInt(circuito.numero_curvas),
+                tiempo_promedio_vuelta: parseFloat(circuito.tiempo_promedio_vuelta)
+            });
             return response.data;
         } catch (error) {
             console.error('Error al actualizar circuito:', error);

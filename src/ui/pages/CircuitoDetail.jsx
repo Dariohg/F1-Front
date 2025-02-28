@@ -1,7 +1,15 @@
 import  { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card, Row, Col, Typography, Statistic, Button, Divider, notification, Spin, Space, Table, Tag } from 'antd';
-import { ArrowLeftOutlined, FlagOutlined, EnvironmentOutlined, DashboardOutlined, FieldTimeOutlined, UserOutlined } from '@ant-design/icons';
+import {
+    ArrowLeftOutlined,
+    FlagOutlined,
+    EnvironmentOutlined,
+    DashboardOutlined,
+    FieldTimeOutlined,
+    UserOutlined,
+    ClockCircleOutlined
+} from '@ant-design/icons';
 import circuitoRepository from '../../infrastructure/repositories/CircuitoRepository';
 import circuitoPilotosRepository from '../../infrastructure/repositories/CircuitoPilotosRepository';
 import RaceSimulation from '../components/RaceSimulation';
@@ -143,7 +151,7 @@ function CircuitoDetail() {
                     </Col>
                     <Col xs={24} md={8}>
                         <Row gutter={16}>
-                            <Col span={8}>
+                            <Col span={6}>
                                 <Statistic
                                     title="Longitud"
                                     value={circuito.longitud}
@@ -151,17 +159,25 @@ function CircuitoDetail() {
                                     prefix={<DashboardOutlined />}
                                 />
                             </Col>
-                            <Col span={8}>
+                            <Col span={6}>
                                 <Statistic
                                     title="Vueltas"
                                     value={circuito.numero_vueltas}
                                     prefix={<FieldTimeOutlined />}
                                 />
                             </Col>
-                            <Col span={8}>
+                            <Col span={6}>
                                 <Statistic
                                     title="Curvas"
                                     value={circuito.numero_curvas}
+                                />
+                            </Col>
+                            <Col span={6}>
+                                <Statistic
+                                    title="Tiempo Promedio"
+                                    value={circuito.tiempo_promedio_vuelta.toFixed(3)}
+                                    suffix="s"
+                                    prefix={<ClockCircleOutlined />}
                                 />
                             </Col>
                         </Row>

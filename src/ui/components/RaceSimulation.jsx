@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Table, Button, Typography, Card, Space, Tag, Tooltip, Badge, Alert, Empty } from 'antd';
-import { CarOutlined, TrophyOutlined, ClockCircleOutlined, PauseCircleOutlined, PlayCircleOutlined, SyncOutlined,
-    InfoCircleOutlined } from '@ant-design/icons';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Table, Button, Typography, Card, Space, Tag, Tooltip, Badge, Alert, Empty, Modal, notification } from 'antd';
+import {
+    CarOutlined, TrophyOutlined, ClockCircleOutlined, PauseCircleOutlined,
+    PlayCircleOutlined, SyncOutlined, InfoCircleOutlined, CheckCircleOutlined,
+    FireOutlined
+} from '@ant-design/icons';
 import PropTypes from 'prop-types';
 import RaceSimulationService from '../../infrastructure/services/RaceSimulationService';
-import PosicionesPollingService from '../../infrastructure/services/PosicionesPollingService';
+import RecordPollingService from '../../infrastructure/services/RecordPollingService';
 import tiempoVueltaRepository from '../../infrastructure/repositories/TiempoVueltaRepository';
-import posicionesRepository from '../../infrastructure/repositories/PosicionesRepository';
 
 const { Title, Text } = Typography;
 
@@ -14,28 +16,45 @@ const { Title, Text } = Typography;
  * Componente para la simulación de una carrera en tiempo real
  */
 const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
+    // Estado para almacenar datos de la carrera
+    // eslint-disable-next-line no-unused-vars - Se usa en renderizado condicional
     const [tiemposVuelta, setTiemposVuelta] = useState([]);
     const [posiciones, setPosiciones] = useState([]);
     const [simulationActive, setSimulationActive] = useState(false);
     const [loadingTiempos, setLoadingTiempos] = useState(true);
-    const [pollingActive, setPollingActive] = useState(false);
     const [tiemposCount, setTiemposCount] = useState(0);
-    const [pollNumber, setPollNumber] = useState(0);
     const [lastUpdate, setLastUpdate] = useState(null);
     const [error, setError] = useState(null);
     const [statusMessage, setStatusMessage] = useState("Esperando iniciar simulación");
+    const [forceRender, setForceRender] = useState(0); // Estado para forzar renderizado
+    const [winner, setWinner] = useState(null); // Estado para almacenar el ganador
+    const [showWinnerModal, setShowWinnerModal] = useState(false); // Estado para mostrar el modal del ganador
+    const [recordPollingActive, setRecordPollingActive] = useState(false); // Estado para el polling de récords
+
+    // Referencias para mantener el estado actualizado en callbacks
+    const posicionesRef = useRef(posiciones);
+    const circuitoRef = useRef(circuito);
+    const pilotosRef = useRef(pilotos);
+
+    // Actualizar referencias cuando cambien los props/estado
+    useEffect(() => {
+        posicionesRef.current = posiciones;
+        circuitoRef.current = circuito;
+        pilotosRef.current = pilotos;
+    }, [posiciones, circuito, pilotos]);
 
     // Crear servicios
-    const raceService = useMemo(() => {
-        // Pasar también el repositorio de posiciones para sincronizar
-        return new RaceSimulationService(tiempoVueltaRepository, posicionesRepository);
-    }, []);
+    const raceService = useMemo(() =>
+            new RaceSimulationService(tiempoVueltaRepository),
+        []);
 
-    const posicionesService = useMemo(() => {
-        return new PosicionesPollingService(posicionesRepository);
-    }, []);
+    const recordService = useMemo(() =>
+            new RecordPollingService(),
+        []);
 
-    // Función para cargar los tiempos de vuelta existentes
+    /**
+     * Carga los tiempos de vuelta existentes desde el repositorio
+     */
     const cargarTiempos = useCallback(async () => {
         if (!circuito?.id) {
             setStatusMessage("No se ha seleccionado un circuito válido");
@@ -45,185 +64,38 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
 
         setLoadingTiempos(true);
         setStatusMessage("Cargando tiempos existentes...");
+
         try {
             const tiempos = await tiempoVueltaRepository.obtenerTiemposPorCircuito(circuito.id);
-            console.log("Tiempos cargados:", tiempos);
+            console.log("[RaceSimulation] Tiempos cargados:", tiempos);
 
-            // Asegurarnos de que siempre sea un array, incluso si la API devuelve null/undefined
+            // Asegurarse de que siempre sea un array, incluso si la API devuelve null/undefined
             const tiemposArray = Array.isArray(tiempos) ? tiempos : [];
             setTiemposVuelta(tiemposArray);
             setTiemposCount(tiemposArray.length);
             setStatusMessage(`${tiemposArray.length} tiempos cargados. Listo para iniciar simulación.`);
             setError(null);
         } catch (error) {
-            console.error('Error al cargar tiempos:', error);
-            // Si hay un error, inicializamos con un array vacío
+            console.error('[RaceSimulation] Error al cargar tiempos:', error);
             setTiemposVuelta([]);
             setTiemposCount(0);
             setStatusMessage("Error al cargar tiempos. Intente nuevamente.");
             setError("No se pudieron cargar los tiempos de vuelta. La API podría no estar disponible.");
         } finally {
-            // Siempre desactivamos el spinner después de cargar los datos iniciales
             setLoadingTiempos(false);
         }
     }, [circuito?.id]);
 
-    // Manejar nuevo tiempo de vuelta
-    const handleNewLapTime = useCallback((nuevoTiempo) => {
-        if (nuevoTiempo) {
-            console.log("Nuevo tiempo recibido:", nuevoTiempo);
-            setTiemposVuelta(prevTiempos => [...prevTiempos, nuevoTiempo]);
-            setTiemposCount(prev => prev + 1);
-            setStatusMessage(`Nuevo tiempo registrado para piloto ${nuevoTiempo.conductor_id}`);
-            // Asegurarnos de que el spinner no esté visible cuando llegan nuevos tiempos
-            setLoadingTiempos(false);
-            setError(null);
-        }
-    }, []);
+    /**
+     * Inicializa las posiciones de los pilotos
+     */
+    const inicializarPosiciones = useCallback(() => {
+        // Inicializar siempre si hay pilotos disponibles
+        if (pilotosRef.current && pilotosRef.current.length > 0) {
+            console.log("[RaceSimulation] Inicializando posiciones para", pilotosRef.current.length, "pilotos");
 
-    // Manejar actualización de posiciones oficiales
-    const handlePosicionesUpdate = useCallback((data) => {
-        console.log("Actualización de posiciones recibida:", data);
-
-        // Si data es un string, puede contener múltiples objetos JSON concatenados
-        let jsonData = data;
-        if (typeof data === 'string') {
-            try {
-                // Intentar extraer el primer objeto JSON válido
-                const firstObjectEndIndex = data.indexOf('}') + 1;
-                const firstObject = data.substring(0, firstObjectEndIndex);
-                jsonData = JSON.parse(firstObject);
-            } catch (error) {
-                console.error("Error al parsear posiciones concatenadas:", error);
-                return;
-            }
-        }
-
-        // Si data no es un objeto después de intentar parsear
-        if (!jsonData || typeof jsonData !== 'object') {
-            console.warn("Datos de posiciones inválidos: formato no es un objeto", jsonData);
-            return;
-        }
-
-        // Verificar si hay posiciones
-        if (!Array.isArray(jsonData.posiciones)) {
-            console.warn("Datos de posiciones inválidos: posiciones no es un array", jsonData);
-            return;
-        }
-
-        setPollNumber(jsonData.poll_number || 0);
-        setLastUpdate(jsonData.timestamp || new Date().toISOString());
-
-        // Actualizar posiciones directamente desde el servidor
-        const posicionesServer = jsonData.posiciones.map(pos => {
-            // Buscar datos del piloto
-            const piloto = pilotos.find(p => p.id === pos.conductor_id);
-            if (!piloto) return null;
-
-            return {
-                id: pos.conductor_id,
-                posicion: pos.posicion,
-                nombre: piloto.nombre_completo || 'Desconocido',
-                equipo: piloto.nombre_equipo || 'Desconocido',
-                numero: piloto.numero_carro || 0,
-                timestamp: pos.timestamp
-            };
-        }).filter(Boolean).sort((a, b) => a.posicion - b.posicion);
-
-        console.log("Posiciones procesadas:", posicionesServer);
-
-        // Establecer las posiciones directamente desde el servidor
-        if (posicionesServer.length > 0) {
-            setPosiciones(posicionesServer);
-            setStatusMessage(`Posiciones actualizadas (Poll #${jsonData.poll_number})`);
-            setError(null);
-        }
-    }, [pilotos]);
-
-    // Iniciar simulación
-    const iniciarSimulacion = useCallback(() => {
-        if (!circuito?.id) {
-            setError("No se ha seleccionado un circuito válido");
-            return;
-        }
-
-        if (!pilotos?.length) {
-            setError("No hay pilotos registrados para este circuito");
-            return;
-        }
-
-        setStatusMessage("Iniciando simulación...");
-        console.log("Iniciando simulación para circuito:", circuito.id, "con pilotos:", pilotos);
-
-        try {
-            // Iniciar simulación de tiempos y posiciones (ahora integrados en un solo servicio)
-            raceService.start(circuito.id, pilotos, handleNewLapTime);
-
-            // Iniciar polling de posiciones para obtener actualizaciones del servidor
-            posicionesService.startPolling(circuito.id, handlePosicionesUpdate);
-
-            setSimulationActive(true);
-            setPollingActive(true);
-            setError(null);
-            setStatusMessage("Simulación iniciada correctamente");
-        } catch (error) {
-            console.error("Error al iniciar simulación:", error);
-            setError("Error al iniciar la simulación. Verifique la consola para más detalles.");
-            setStatusMessage("Error al iniciar simulación");
-        }
-    }, [circuito?.id, pilotos, raceService, posicionesService, handleNewLapTime, handlePosicionesUpdate]);
-
-    // Detener simulación
-    const detenerSimulacion = useCallback(() => {
-        setStatusMessage("Deteniendo simulación...");
-
-        try {
-            raceService.stop();
-            posicionesService.stopPolling();
-
-            setSimulationActive(false);
-            setPollingActive(false);
-            setStatusMessage("Simulación detenida");
-        } catch (error) {
-            console.error("Error al detener simulación:", error);
-            setError("Error al detener la simulación");
-            setStatusMessage("Error al detener simulación");
-        }
-    }, [raceService, posicionesService]);
-
-    // Efecto para cargar tiempos iniciales
-    useEffect(() => {
-        cargarTiempos();
-
-        // También podemos hacer un polling inicial para obtener posiciones existentes
-        if (circuito?.id) {
-            setStatusMessage("Obteniendo posiciones iniciales...");
-            posicionesRepository.obtenerPosiciones(circuito.id)
-                .then(data => {
-                    console.log("Posiciones iniciales:", data);
-                    handlePosicionesUpdate(data);
-                    setStatusMessage("Posiciones iniciales cargadas");
-                })
-                .catch(error => {
-                    console.error('Error al obtener posiciones iniciales:', error);
-                    setStatusMessage("Error al obtener posiciones iniciales");
-                });
-        }
-
-        // Limpiar simulación al desmontar
-        return () => {
-            raceService.stop();
-            posicionesService.stopPolling();
-            setStatusMessage("Componente desmontado");
-        };
-    }, [cargarTiempos, raceService, posicionesService, circuito?.id, handlePosicionesUpdate]);
-
-    // Crear pilotos iniciales si no hay posiciones
-    useEffect(() => {
-        // Si no hay posiciones pero hay pilotos, crear posiciones iniciales
-        if (posiciones.length === 0 && pilotos.length > 0 && !loadingTiempos) {
-            // Crear posiciones iniciales estáticas (no enviadas al backend aún)
-            const posicionesIniciales = pilotos.map((piloto, index) => ({
+            // Crear posiciones iniciales en el orden de la lista de pilotos
+            const posicionesIniciales = pilotosRef.current.map((piloto, index) => ({
                 id: piloto.id,
                 nombre: piloto.nombre_completo || 'Desconocido',
                 equipo: piloto.nombre_equipo || 'Desconocido',
@@ -231,59 +103,192 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
                 posicion: index + 1,
                 vueltas: 0,
                 mejorTiempo: 0,
-                ultimoTiempo: 0
+                ultimoTiempo: 0,
+                _freshUpdate: new Date().getTime() // Forzar "frescura" para evitar problemas de memo
             }));
 
-            console.log("Creando posiciones iniciales:", posicionesIniciales);
+            console.log("[RaceSimulation] Posiciones iniciales creadas:", posicionesIniciales);
+
+            // Actualizar posiciones en el componente
             setPosiciones(posicionesIniciales);
+            setForceRender(prev => prev + 1); // Forzar renderizado
         }
-    }, [pilotos, posiciones.length, loadingTiempos]);
+    }, []);
 
-    // Calcular los datos de los pilotos para mostrar información de vueltas y tiempos
-    const pilotosData = useMemo(() => {
-        if (!Array.isArray(tiemposVuelta) || !Array.isArray(posiciones)) {
-            return [];
-        }
+    /**
+     * Maneja la recepción de un nuevo tiempo de vuelta
+     */
+    const handleNewLapTime = useCallback((nuevoTiempo) => {
+        if (!nuevoTiempo) return;
 
-        console.log("Calculando datos de pilotos con posiciones:", posiciones.length, "y tiempos:", tiemposVuelta.length);
+        console.log("[RaceSimulation] Nuevo tiempo recibido:", nuevoTiempo);
 
-        // Para cada piloto en las posiciones, enriquecer con datos de tiempos de vuelta
-        return posiciones.map(posicion => {
-            const pilotoId = posicion.id;
+        setTiemposVuelta(prevTiempos => [...prevTiempos, nuevoTiempo]);
+        setTiemposCount(prev => prev + 1);
+        setStatusMessage(`Nuevo tiempo registrado para piloto ${nuevoTiempo.conductor_id}`);
+        setLoadingTiempos(false);
+        setError(null);
+        setLastUpdate(new Date());
+        setForceRender(prev => prev + 1); // Forzar actualización para reflejar cambios
+    }, []);
 
-            // Calcular el mejor tiempo
-            let mejorTiempo = 0;
-            tiemposVuelta.forEach(tiempo => {
-                if (tiempo && tiempo.conductor_id === pilotoId) {
-                    if (mejorTiempo === 0 || tiempo.tiempo < mejorTiempo) {
-                        mejorTiempo = tiempo.tiempo;
-                    }
-                }
-            });
+    /**
+     * Maneja la actualización de posiciones desde el servicio
+     */
+    const handlePositionsChanged = useCallback((nuevasPosiciones) => {
+        if (!nuevasPosiciones || !Array.isArray(nuevasPosiciones)) return;
 
-            // Calcular vueltas completadas
-            const vueltas = tiemposVuelta.filter(
-                tiempo => tiempo && tiempo.conductor_id === pilotoId
-            ).length;
+        console.log("[RaceSimulation] Posiciones actualizadas:", nuevasPosiciones);
+        setPosiciones(nuevasPosiciones);
+        setForceRender(prev => prev + 1); // Forzar renderizado
+        setLastUpdate(new Date());
+    }, []);
 
-            // Obtener último tiempo
-            const tiemposDelPiloto = tiemposVuelta.filter(
-                tiempo => tiempo && tiempo.conductor_id === pilotoId
-            ).sort((a, b) => (b.numero_vuelta || 0) - (a.numero_vuelta || 0));
+    /**
+     * Maneja la detección de un nuevo récord
+     */
+    const handleRecordDetected = useCallback((record) => {
+        console.log("[RaceSimulation] ¡RÉCORD DETECTADO!", record);
 
-            const ultimoTiempo = tiemposDelPiloto.length > 0 ? tiemposDelPiloto[0].tiempo : 0;
-
-            // Devolver piloto con todos los datos
-            return {
-                ...posicion,
-                vueltas,
-                mejorTiempo,
-                ultimoTiempo
-            };
+        // Mostrar notificación visual
+        notification.success({
+            message: '¡Récord de vuelta!',
+            description: `${record.nombre_piloto} ha establecido un nuevo récord con ${record.tiempo_vuelta.toFixed(3)}s (${record.diferencia_tiempo.toFixed(3)}s más rápido)`,
+            placement: 'topRight',
+            duration: 6,
+            icon: <FireOutlined style={{ color: '#ff4d4f' }} />
         });
-    }, [tiemposVuelta, posiciones]);
+    }, []);
 
-    // Columnas para la tabla
+    /**
+     * Maneja el fin de la carrera
+     */
+    const handleRaceFinished = useCallback((raceResult) => {
+        console.log("[RaceSimulation] Carrera finalizada:", raceResult);
+        setWinner(raceResult);
+        setShowWinnerModal(true);
+        setSimulationActive(false);
+        setStatusMessage(`Carrera finalizada. Ganador: ${raceResult.winnerName}`);
+
+        // Detener el polling de récords
+        if (recordPollingActive) {
+            recordService.stopPolling();
+            setRecordPollingActive(false);
+        }
+    }, [recordService, recordPollingActive]);
+
+    /**
+     * Inicia la simulación de carrera
+     */
+    const iniciarSimulacion = useCallback(() => {
+        if (!circuitoRef.current?.id) {
+            setError("No se ha seleccionado un circuito válido");
+            return;
+        }
+
+        if (!pilotosRef.current?.length) {
+            setError("No hay pilotos registrados para este circuito");
+            return;
+        }
+
+        setStatusMessage("Iniciando simulación...");
+        console.log("[RaceSimulation] Iniciando simulación para circuito:",
+            circuitoRef.current.id, "con pilotos:", pilotosRef.current);
+
+        try {
+            // Limpiar estado anterior
+            setPosiciones([]);
+            setTiemposVuelta([]);
+            setTiemposCount(0);
+            setWinner(null);
+
+            // Inicializar posiciones
+            inicializarPosiciones();
+
+            // Iniciar polling de récords
+            recordService.startPolling(circuitoRef.current.id, handleRecordDetected);
+            setRecordPollingActive(true);
+
+            // Iniciar simulación con los callbacks
+            raceService.start(
+                circuitoRef.current.id,
+                circuitoRef.current,
+                pilotosRef.current,
+                handleNewLapTime,
+                handlePositionsChanged,
+                handleRaceFinished
+            );
+
+            setSimulationActive(true);
+            setError(null);
+            setStatusMessage("Simulación iniciada correctamente");
+        } catch (error) {
+            console.error("[RaceSimulation] Error al iniciar simulación:", error);
+            setError("Error al iniciar la simulación. Verifique la consola para más detalles.");
+            setStatusMessage("Error al iniciar simulación");
+
+            // Detener servicios en caso de error
+            if (recordPollingActive) {
+                recordService.stopPolling();
+                setRecordPollingActive(false);
+            }
+        }
+    }, [
+        raceService,
+        recordService,
+        handleNewLapTime,
+        handlePositionsChanged,
+        handleRaceFinished,
+        handleRecordDetected,
+        inicializarPosiciones
+    ]);
+
+    /**
+     * Detiene la simulación de carrera
+     */
+    const detenerSimulacion = useCallback(() => {
+        setStatusMessage("Deteniendo simulación...");
+
+        try {
+            raceService.stop();
+            if (recordPollingActive) {
+                recordService.stopPolling();
+                setRecordPollingActive(false);
+            }
+
+            setSimulationActive(false);
+            setStatusMessage("Simulación detenida");
+        } catch (error) {
+            console.error("[RaceSimulation] Error al detener simulación:", error);
+            setError("Error al detener la simulación");
+            setStatusMessage("Error al detener simulación");
+        }
+    }, [raceService, recordService, recordPollingActive]);
+
+    // Cargar datos iniciales y configurar cleanup
+    useEffect(() => {
+        cargarTiempos();
+
+        // Inicializar posiciones al montar
+        inicializarPosiciones();
+
+        // Limpiar al desmontar
+        return () => {
+            console.log("[RaceSimulation] Limpiando servicios...");
+            raceService.stop();
+            recordService.stopPolling();
+        };
+    }, [cargarTiempos, raceService, recordService, inicializarPosiciones]);
+
+    // Efecto adicional para inicializar posiciones cuando los pilotos cambian
+    useEffect(() => {
+        // Solo inicializar si hay pilotos nuevos y no hay posiciones actuales
+        if (pilotos.length > 0 && posiciones.length === 0) {
+            inicializarPosiciones();
+        }
+    }, [pilotos, posiciones.length, inicializarPosiciones]);
+
+    // Columnas para la tabla de pilotos
     const columns = [
         {
             title: 'Pos',
@@ -317,9 +322,15 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
             dataIndex: 'vueltas',
             key: 'vueltas',
             width: 100,
-            render: (vueltas) => (
-                <Tag color="green">{vueltas}</Tag>
-            ),
+            render: (vueltas, record) => {
+                // Destacar las vueltas cuando el piloto es el ganador
+                const isWinner = winner && winner.winnerId === record.id;
+                return (
+                    <Tag color={isWinner ? "gold" : "green"}>
+                        {vueltas} {isWinner && <CheckCircleOutlined />}
+                    </Tag>
+                );
+            },
         },
         {
             title: 'Mejor Tiempo',
@@ -339,7 +350,7 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
 
     // Renderizado condicional según el estado
     const renderContent = () => {
-        if (loadingTiempos && pilotosData.length === 0) {
+        if (loadingTiempos && posiciones.length === 0) {
             return (
                 <div style={{ textAlign: 'center', padding: '40px 0' }}>
                     <SyncOutlined spin style={{ fontSize: 24 }} />
@@ -348,7 +359,7 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
             );
         }
 
-        if (pilotosData.length === 0) {
+        if (posiciones.length === 0) {
             return (
                 <Empty
                     image={Empty.PRESENTED_IMAGE_SIMPLE}
@@ -361,17 +372,54 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
             );
         }
 
+        // Usar la propiedad de clave para forzar un re-renderizado completo
         return (
             <Table
-                dataSource={pilotosData}
+                dataSource={posiciones}
                 columns={columns}
-                rowKey="id"
-                loading={loadingTiempos && pilotosData.length === 0}
+                rowKey={record => `${record.id}_${forceRender}`}
+                loading={loadingTiempos && posiciones.length === 0}
                 pagination={false}
                 size="middle"
             />
         );
     };
+
+    // Modal para mostrar al ganador
+    const winnerModal = (
+        <Modal
+            title={<Space><TrophyOutlined style={{ color: 'gold' }} /> ¡Tenemos un ganador!</Space>}
+            open={showWinnerModal}
+            onOk={() => setShowWinnerModal(false)}
+            onCancel={() => setShowWinnerModal(false)}
+            footer={[
+                <Button key="close" type="primary" onClick={() => setShowWinnerModal(false)}>
+                    Cerrar
+                </Button>
+            ]}
+        >
+            {winner && (
+                <div style={{ textAlign: 'center' }}>
+                    <Title level={2} style={{ color: 'gold' }}>
+                        <TrophyOutlined /> {winner.winnerName}
+                    </Title>
+                    <p>
+                        <Text strong>
+                            Ha completado las {winner.totalLaps} vueltas del circuito {circuito?.nombre}
+                        </Text>
+                    </p>
+                    <p>
+                        <Tag color="gold">1º Posición</Tag>
+                    </p>
+                    <p>
+                        <Text type="secondary">
+                            Total de pilotos: {winner.totalPilotos}
+                        </Text>
+                    </p>
+                </div>
+            )}
+        </Modal>
+    );
 
     return (
         <Card
@@ -382,6 +430,7 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
                     </Title>
                     <Text type="secondary">
                         {circuito?.nombre || 'Circuito'} - {circuito?.pais || ''}
+                        {circuito?.numero_vueltas && ` (${circuito.numero_vueltas} vueltas)`}
                     </Text>
                 </Space>
             }
@@ -392,8 +441,9 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
                             type={simulationActive ? "default" : "primary"}
                             icon={simulationActive ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
                             onClick={simulationActive ? detenerSimulacion : iniciarSimulacion}
+                            disabled={!!winner} // Deshabilitar si hay un ganador
                         >
-                            {simulationActive ? "Pausar" : "Iniciar"}
+                            {simulationActive ? "Pausar" : winner ? "Carrera finalizada" : "Iniciar"}
                         </Button>
                     </Tooltip>
                     <Space size={4}>
@@ -402,10 +452,10 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
                                 {tiemposCount} tiempos
                             </Tag>
                         </Tooltip>
-                        {pollingActive && (
+                        {simulationActive && (
                             <Badge status="processing" text={
                                 <Text type="secondary">
-                                    <SyncOutlined spin /> Poll #{pollNumber}
+                                    <SyncOutlined spin /> Simulación en curso
                                 </Text>
                             } />
                         )}
@@ -413,6 +463,7 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
                 </Space>
             }
             style={{ marginBottom: 24 }}
+            key={forceRender} // Ayuda a forzar re-renderizado
         >
             {error && (
                 <Alert
@@ -439,35 +490,33 @@ const RaceSimulation = ({ circuito = null, pilotos = [] }) => {
             {lastUpdate && (
                 <div style={{ marginTop: 16, textAlign: 'right' }}>
                     <Text type="secondary">
-                        Última actualización: {new Date(lastUpdate).toLocaleTimeString()}
+                        Última actualización: {lastUpdate.toLocaleTimeString()}
                     </Text>
                 </div>
             )}
+
+            {winnerModal}
         </Card>
     );
 };
 
 // Definimos las propTypes para validar las props recibidas
 RaceSimulation.propTypes = {
-    // Definición de la estructura del objeto circuito
     circuito: PropTypes.shape({
         id: PropTypes.number,
         nombre: PropTypes.string,
         pais: PropTypes.string,
-        // Añadir otras propiedades según sea necesario
         longitud: PropTypes.number,
         numero_vueltas: PropTypes.number,
-        numero_curvas: PropTypes.number
+        numero_curvas: PropTypes.number,
+        tiempo_promedio_vuelta: PropTypes.number
     }),
-
-    // Definición del array de pilotos
     pilotos: PropTypes.arrayOf(
         PropTypes.shape({
             id: PropTypes.number,
             nombre_completo: PropTypes.string,
             nombre_equipo: PropTypes.string,
             numero_carro: PropTypes.number,
-            // Añadir otras propiedades según sea necesario
             nacionalidad: PropTypes.string,
             edad: PropTypes.number
         })

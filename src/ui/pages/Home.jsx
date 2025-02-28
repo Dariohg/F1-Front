@@ -139,6 +139,10 @@ function Home() {
                 <span className={styles.label}>Curvas:</span>
                 <span>{circuito.numero_curvas}</span>
             </div>
+            <div className={styles.dataRow}>
+                <span className={styles.label}>Tiempo promedio:</span>
+                <span>{circuito.tiempo_promedio_vuelta.toFixed(3)}s</span>
+            </div>
         </Card>
     );
 
