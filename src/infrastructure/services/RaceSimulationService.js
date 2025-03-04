@@ -1,6 +1,8 @@
+// src/infrastructure/services/RaceSimulationService.js
+
 /**
  * Servicio para simular una carrera generando tiempos aleatorios para los pilotos
- * Versión simplificada que se basa solo en tiempos de vuelta
+ * Versión optimizada para rendimiento y consistencia
  */
 class RaceSimulationService {
     constructor(tiempoVueltaRepository) {
@@ -20,10 +22,14 @@ class RaceSimulationService {
         this.maxRetries = 3; // Número máximo de reintentos en caso de error
         this.retryDelayMs = 1000; // Tiempo entre reintentos (1 segundo)
         this.lastPositionsUpdate = 0; // Último timestamp de actualización de posiciones
-        this.positionsUpdateInterval = 1000; // Intervalo para calcular posiciones (ms)
+        this.positionsUpdateInterval = 1500; // Aumentado a 1.5 segundos para reducir frecuencia de actualizaciones
         this.positionsTimer = null; // Timer para actualizaciones periódicas de posiciones
         this.winnerDetermined = false; // Flag para indicar si ya se determinó un ganador
         this.pilotosFinalizados = new Set(); // Set para llevar registro de pilotos que han finalizado
+        this.updateThrottleMs = 200; // Tiempo mínimo entre actualizaciones de UI (200ms)
+        this.lastUIUpdate = 0; // Último timestamp de actualización de UI
+        this.pendingUIUpdate = false; // Flag para trackear actualizaciones pendientes
+        this.carreraFinalizada = false; // Nueva bandera para controlar el fin de la carrera
     }
 
     /**
@@ -55,7 +61,10 @@ class RaceSimulationService {
         this.ultimosTiempos.clear();
         this.posicionesPorPiloto.clear();
         this.lastPositionsUpdate = 0;
+        this.lastUIUpdate = 0;
+        this.pendingUIUpdate = false;
         this.winnerDetermined = false;
+        this.carreraFinalizada = false; // Inicializar la bandera de carrera finalizada
         this.pilotosFinalizados.clear();
 
         // Validar que tengamos pilotos para simular
@@ -83,7 +92,7 @@ class RaceSimulationService {
                 // Escalonar el inicio de cada piloto para que no empiecen todos al mismo tiempo
                 setTimeout(() => {
                     this.scheduleNextLap(piloto.id);
-                }, index * 1000); // 1 segundo entre cada piloto
+                }, index * 1200); // Aumentado a 1.2 segundos entre cada piloto para mejor distribución
             }
         });
 
@@ -98,6 +107,7 @@ class RaceSimulationService {
      */
     stop() {
         this.isRunning = false;
+        this.carreraFinalizada = true; // Marcar la carrera como finalizada
 
         // Limpiar todos los timers
         this.timers.forEach(timer => clearTimeout(timer));
@@ -117,7 +127,8 @@ class RaceSimulationService {
      * @param {number} pilotoId - ID del piloto
      */
     scheduleNextLap(pilotoId) {
-        if (!this.isRunning) return;
+        // Verificar si la carrera está activa y no ha finalizado
+        if (!this.isRunning || this.carreraFinalizada) return;
 
         // Si el piloto ya ha finalizado, no programamos más vueltas
         if (this.pilotosFinalizados.has(pilotoId)) {
@@ -132,9 +143,14 @@ class RaceSimulationService {
             // Este piloto ha terminado la carrera
             this.pilotosFinalizados.add(pilotoId);
 
-            // Si es el primer piloto en terminar, lo marcamos como ganador
+            // Si es el primer piloto en terminar, lo marcamos como ganador y detenemos la carrera
             if (!this.winnerDetermined) {
                 this.winnerDetermined = true;
+                this.carreraFinalizada = true; // Marcar la carrera como finalizada
+
+                // Forzar una actualización final de posiciones
+                this.calculatePositions();
+                this.notifyPositionsChanged();
 
                 // Notificar fin de carrera si hay un callback
                 if (this.onRaceFinished) {
@@ -147,17 +163,17 @@ class RaceSimulationService {
                     });
                 }
 
-                // Detener la simulación si ya no hay pilotos activos
-                const pilotosActivos = this.pilotos.filter(p => !this.pilotosFinalizados.has(p.id)).length;
-                if (pilotosActivos === 0) {
-                    this.stop();
-                }
+                // Detener la simulación inmediatamente
+                this.stop();
             }
             return;
         }
 
-        // Generar un tiempo aleatorio para completar la vuelta (entre 3 y 8 segundos)
-        const lapDuration = Math.floor(Math.random() * 5000) + 3000;
+        // Generar un tiempo aleatorio para completar la vuelta
+        // Velocidad más realista según el tipo de circuito: entre 5 a 10 segundos
+        const minDuration = 5000;
+        const maxDuration = 10000;
+        const lapDuration = Math.floor(Math.random() * (maxDuration - minDuration)) + minDuration;
 
         // Crear un timer para este piloto
         const timerId = setTimeout(() => {
@@ -170,11 +186,13 @@ class RaceSimulationService {
 
     /**
      * Genera y registra un nuevo tiempo de vuelta para un piloto
+     * Adaptado para manejar el nuevo formato con datos_piloto
      * @param {number} pilotoId - ID del piloto
      * @param {number} retryCount - Contador de reintentos (interno)
      */
     async generateLapTime(pilotoId, retryCount = 0) {
-        if (!this.isRunning || this.pilotosFinalizados.has(pilotoId)) return;
+        // Verificar si la carrera está activa, no ha finalizado y el piloto no ha terminado
+        if (!this.isRunning || this.carreraFinalizada || this.pilotosFinalizados.has(pilotoId)) return;
 
         try {
             // Incrementar el contador de vueltas para este piloto
@@ -185,8 +203,8 @@ class RaceSimulationService {
             // Obtener el tiempo promedio del circuito
             const tiempoPromedio = this.circuito?.tiempo_promedio_vuelta || 90;
 
-            // Determinar si el piloto batirá el tiempo promedio (solo 5% de probabilidad)
-            const batiraPromedio = Math.random() < 0.05;
+            // Determinar si el piloto batirá el tiempo promedio (solo 10% de probabilidad)
+            const batiraPromedio = Math.random() < 0.10;
 
             let tiempoFormateado;
 
@@ -227,9 +245,11 @@ class RaceSimulationService {
                 this.tiemposPorPiloto.set(pilotoId, tiempoFormateado);
             }
 
-            // Notificar a través del callback
+            // Notificar a través del callback (pero sin spammear)
             if (this.onNewLapTime && resultado) {
-                this.onNewLapTime(resultado);
+                this.throttledUICallback(() => {
+                    this.onNewLapTime(resultado);
+                });
             }
 
             // Verificar si necesitamos recalcular posiciones
@@ -241,9 +261,14 @@ class RaceSimulationService {
                 // Este piloto ha terminado la carrera
                 this.pilotosFinalizados.add(pilotoId);
 
-                // Si es el primer piloto en terminar, lo marcamos como ganador
+                // Si es el primer piloto en terminar, lo marcamos como ganador y finalizamos la carrera
                 if (!this.winnerDetermined) {
                     this.winnerDetermined = true;
+                    this.carreraFinalizada = true; // Marcar la carrera como finalizada
+
+                    // Forzar una actualización final de posiciones
+                    this.calculatePositions();
+                    this.notifyPositionsChanged();
 
                     // Notificar fin de carrera si hay un callback
                     if (this.onRaceFinished) {
@@ -256,32 +281,57 @@ class RaceSimulationService {
                         });
                     }
 
-                    // Verificar si todos los pilotos han terminado
-                    const pilotosActivos = this.pilotos.filter(p => !this.pilotosFinalizados.has(p.id)).length;
-                    if (pilotosActivos === 0) {
-                        this.stop();
-                    }
+                    // Detener la simulación inmediatamente
+                    this.stop();
                 }
                 return;
             }
 
-            // Si no ha terminado, programar la próxima vuelta
-            this.scheduleNextLap(pilotoId);
+            // Si no ha terminado y la carrera sigue activa, programar la próxima vuelta
+            if (!this.carreraFinalizada) {
+                this.scheduleNextLap(pilotoId);
+            }
         } catch (error) {
             console.error(`[RaceSimulationService] Error al generar tiempo para piloto ${pilotoId}:`, error);
 
             // Implementar lógica de reintento si no hemos excedido el máximo de reintentos
-            if (retryCount < this.maxRetries && this.isRunning && !this.pilotosFinalizados.has(pilotoId)) {
+            // y la carrera sigue activa
+            if (retryCount < this.maxRetries && this.isRunning && !this.carreraFinalizada && !this.pilotosFinalizados.has(pilotoId)) {
                 setTimeout(() => {
                     this.generateLapTime(pilotoId, retryCount + 1);
                 }, this.retryDelayMs * (retryCount + 1)); // Incrementar el tiempo entre reintentos
             } else {
                 // Si fallaron todos los reintentos, programar la próxima vuelta de todos modos
-                if (this.isRunning && !this.pilotosFinalizados.has(pilotoId)) {
+                // si la carrera sigue activa
+                if (this.isRunning && !this.carreraFinalizada && !this.pilotosFinalizados.has(pilotoId)) {
                     setTimeout(() => this.scheduleNextLap(pilotoId), this.retryDelayMs * 2);
                 }
             }
         }
+    }
+
+    /**
+     * Implementa throttling para las actualizaciones de UI
+     * Esto evita saturar la UI con demasiadas actualizaciones
+     * @param {Function} callback - Función a ejecutar
+     */
+    throttledUICallback(callback) {
+        const now = Date.now();
+        if (now - this.lastUIUpdate > this.updateThrottleMs) {
+            // Ha pasado suficiente tiempo desde la última actualización
+            this.lastUIUpdate = now;
+            callback();
+            this.pendingUIUpdate = false;
+        } else if (!this.pendingUIUpdate) {
+            // Programar una actualización para más tarde
+            this.pendingUIUpdate = true;
+            setTimeout(() => {
+                this.lastUIUpdate = Date.now();
+                callback();
+                this.pendingUIUpdate = false;
+            }, this.updateThrottleMs);
+        }
+        // Si ya hay una actualización pendiente, ignoramos esta llamada
     }
 
     /**
@@ -290,9 +340,9 @@ class RaceSimulationService {
     calculatePositions() {
         if (!this.isRunning) return;
 
-        // No actualizar posiciones con mucha frecuencia
+        // No actualizar posiciones con mucha frecuencia, excepto si la carrera ha finalizado
         const now = Date.now();
-        if (now - this.lastPositionsUpdate < 500) {
+        if (!this.carreraFinalizada && now - this.lastPositionsUpdate < this.positionsUpdateInterval) {
             return;
         }
         this.lastPositionsUpdate = now;
@@ -338,9 +388,17 @@ class RaceSimulationService {
                 }
             });
 
-            // Notificar cambios si es necesario
-            if (posicionesChanged) {
-                this.notifyPositionsChanged();
+            // Notificar cambios si es necesario (con throttling)
+            // Si la carrera ha finalizado, forzar la notificación
+            if (posicionesChanged || this.carreraFinalizada) {
+                if (this.carreraFinalizada) {
+                    // Para actualización final, sin throttling
+                    this.notifyPositionsChanged();
+                } else {
+                    this.throttledUICallback(() => {
+                        this.notifyPositionsChanged();
+                    });
+                }
             }
         } catch (error) {
             console.error('[RaceSimulationService] Error al calcular posiciones:', error);

@@ -24,7 +24,12 @@ class TiempoVueltaRepository extends ITiempoVueltaRepository {
                     conductor_id: tiempoVuelta.conductor_id,
                     numero_vuelta: tiempoVuelta.numero_vuelta,
                     tiempo: tiempoVuelta.tiempo,
-                    created_at: new Date().toISOString()
+                    created_at: new Date().toISOString(),
+                    datos_piloto: {
+                        nombre: "Piloto Simulado",
+                        equipo: "Equipo Simulado",
+                        numero_carro: tiempoVuelta.conductor_id
+                    }
                 };
                 console.log("Tiempo simulado:", simulatedResponse);
                 return simulatedResponse;
@@ -35,7 +40,6 @@ class TiempoVueltaRepository extends ITiempoVueltaRepository {
         }
     }
 
-
     async obtenerTiemposPorCircuito(circuitoId) {
         try {
             console.log(`[TiempoVueltaRepository] Solicitando tiempos para circuito=${circuitoId}`);
@@ -44,15 +48,16 @@ class TiempoVueltaRepository extends ITiempoVueltaRepository {
                 const response = await apiClient.get(`/circuitos/${circuitoId}/tiempos`);
                 console.log("Tiempos obtenidos con éxito:", response.data);
 
-                // Usar parseApiResponse para extraer el objeto JSON más reciente
-                const processedData = parseApiResponse(response.data);
+                // Procesar la respuesta según el nuevo formato
+                const responseData = parseApiResponse(response.data);
 
-                if (processedData && processedData.tiempos_vuelta) {
-                    console.log(`[TiempoVueltaRepository] Procesados ${processedData.tiempos_vuelta.length} tiempos de vuelta`);
-                    return processedData.tiempos_vuelta;
+                if (responseData && responseData.tiempos_vuelta) {
+                    console.log(`[TiempoVueltaRepository] Procesados ${responseData.tiempos_vuelta.length} tiempos de vuelta`);
+                    return responseData.tiempos_vuelta;
                 } else {
                     return [];
                 }
+                // eslint-disable-next-line no-unused-vars
             } catch (apiError) {
                 console.warn('[TiempoVueltaRepository] API no disponible para tiempos. Devolviendo datos simulados.');
                 return [];

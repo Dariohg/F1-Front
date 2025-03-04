@@ -84,7 +84,7 @@ export function parseApiResponse(response) {
     // Si hay múltiples objetos, usar una estrategia para seleccionar el más "reciente"
 
     // 1. Intentar con poll_number (si existe en los objetos)
-    if (objects[0].hasOwnProperty('poll_number')) {
+    if (Object.prototype.hasOwnProperty.call(objects[0], 'poll_number')) {
         return objects.reduce((latest, current) => {
             if (!latest || (current.poll_number > latest.poll_number)) {
                 return current;
@@ -94,7 +94,7 @@ export function parseApiResponse(response) {
     }
 
     // 2. Intentar con timestamp (si existe en los objetos)
-    if (objects[0].hasOwnProperty('timestamp')) {
+    if (Object.prototype.hasOwnProperty.call(objects[0], 'timestamp')) {
         return objects.reduce((latest, current) => {
             if (!latest || new Date(current.timestamp) > new Date(latest.timestamp)) {
                 return current;
