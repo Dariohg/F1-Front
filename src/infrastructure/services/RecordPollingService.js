@@ -13,6 +13,7 @@ class RecordPollingService {
         this.lastPollNumber = 0;
         this.consecutiveErrors = 0;
         this.maxConsecutiveErrors = 3;
+        this.useSimulation = false; // Flag para usar datos simulados
     }
 
     /**
@@ -64,11 +65,35 @@ class RecordPollingService {
 
         try {
             console.log(`[RecordPollingService] Consultando récords para circuito=${this.circuitoId}`);
-            const response = await apiClient.get(`/circuitos/${this.circuitoId}/records`);
-            const data = response.data;
+
+            let data;
+
+            // Primero intentamos obtener los datos del servidor
+            try {
+                const response = await apiClient.get(`/circuitos/${this.circuitoId}/records`);
+                data = response.data;
+                this.useSimulation = false; // Si la respuesta es exitosa, no usamos simulación
+            } catch (apiError) {
+                console.warn('[RecordPollingService] API de récords no disponible, usando simulación:', apiError.message);
+                this.useSimulation = true;
+
+                // Generar datos simulados con probabilidad del 15% de detectar un récord
+                const detectarRecord = Math.random() < 0.15;
+
+                // Simulamos el aumento del poll_number
+                const newPollNumber = this.lastPollNumber + 1;
+
+                data = {
+                    poll_number: newPollNumber,
+                    record_detectado: detectarRecord,
+                    record: detectarRecord ? this.generateSimulatedRecord(this.circuitoId) : null
+                };
+
+                console.log('[RecordPollingService] Datos simulados generados:', data);
+            }
 
             if (!data) {
-                console.warn('[RecordPollingService] No se recibieron datos del servidor');
+                console.warn('[RecordPollingService] No se recibieron datos del servidor o simulación');
                 this.consecutiveErrors++;
                 return;
             }
@@ -105,6 +130,36 @@ class RecordPollingService {
                 }
             }
         }
+    }
+
+    /**
+     * Genera un récord simulado (para desarrollo)
+     * @param {number} circuitoId - ID del circuito
+     * @returns {Object} Objeto con datos de récord simulados
+     * @private
+     */
+    generateSimulatedRecord(circuitoId) {
+        // Lista de nombres de muestra para la simulación
+        const nombresPilotos = [
+            "Max Verstappen", "Lewis Hamilton", "Charles Leclerc",
+            "Lando Norris", "Carlos Sainz", "Fernando Alonso"
+        ];
+
+        const pilotoIndex = Math.floor(Math.random() * nombresPilotos.length);
+        const tiempo = 80 + (Math.random() * 10); // Tiempo entre 80 y 90 segundos
+        const diferencia = 0.1 + (Math.random() * 0.5); // Diferencia entre 0.1 y 0.6 segundos
+
+        return {
+            id: Math.floor(Math.random() * 10000),
+            circuito_id: parseInt(circuitoId),
+            conductor_id: pilotoIndex + 1,
+            nombre_piloto: nombresPilotos[pilotoIndex],
+            vuelta: Math.floor(Math.random() * 50) + 1,
+            tiempo_vuelta: parseFloat(tiempo.toFixed(3)),
+            tiempo_anterior: parseFloat((tiempo + diferencia).toFixed(3)),
+            diferencia_tiempo: parseFloat(diferencia.toFixed(3)),
+            timestamp: new Date().toISOString()
+        };
     }
 
     /**

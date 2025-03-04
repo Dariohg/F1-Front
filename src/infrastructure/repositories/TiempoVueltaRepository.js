@@ -1,5 +1,6 @@
 import apiClient from '../api/apiClient';
 import ITiempoVueltaRepository from '../../core/interfaces/ITiempoVueltaRepository';
+import {parseApiResponse} from "../../utils/jsonHelpers.js";
 
 class TiempoVueltaRepository extends ITiempoVueltaRepository {
     async registrarTiempo(circuitoId, tiempoVuelta) {
@@ -13,6 +14,7 @@ class TiempoVueltaRepository extends ITiempoVueltaRepository {
                 });
                 console.log("Tiempo registrado con éxito:", response.data);
                 return response.data;
+                // eslint-disable-next-line no-unused-vars
             } catch (apiError) {
                 console.warn('API no disponible para tiempos. Usando datos simulados.');
                 // Simular una respuesta exitosa para desarrollo
@@ -33,22 +35,30 @@ class TiempoVueltaRepository extends ITiempoVueltaRepository {
         }
     }
 
+
     async obtenerTiemposPorCircuito(circuitoId) {
         try {
-            // MODO DESARROLLO: Si el backend aún no está listo, devolver datos simulados
+            console.log(`[TiempoVueltaRepository] Solicitando tiempos para circuito=${circuitoId}`);
+
             try {
                 const response = await apiClient.get(`/circuitos/${circuitoId}/tiempos`);
                 console.log("Tiempos obtenidos con éxito:", response.data);
-                return response.data;
-                // eslint-disable-next-line no-unused-vars
+
+                // Usar parseApiResponse para extraer el objeto JSON más reciente
+                const processedData = parseApiResponse(response.data);
+
+                if (processedData && processedData.tiempos_vuelta) {
+                    console.log(`[TiempoVueltaRepository] Procesados ${processedData.tiempos_vuelta.length} tiempos de vuelta`);
+                    return processedData.tiempos_vuelta;
+                } else {
+                    return [];
+                }
             } catch (apiError) {
-                console.warn('API no disponible para tiempos. Devolviendo datos simulados.');
-                // Devolver un array vacío para desarrollo (la primera vez)
+                console.warn('[TiempoVueltaRepository] API no disponible para tiempos. Devolviendo datos simulados.');
                 return [];
             }
         } catch (error) {
-            console.error('Error al obtener tiempos de vuelta:', error);
-            // En caso de error, devolver un array vacío para evitar errores en cascada
+            console.error('[TiempoVueltaRepository] Error al obtener tiempos de vuelta:', error);
             return [];
         }
     }
